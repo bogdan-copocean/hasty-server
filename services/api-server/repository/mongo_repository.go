@@ -3,6 +3,7 @@ package repository
 import (
 	"context"
 	"errors"
+	"fmt"
 
 	"github.com/bogdan-copocean/hasty-server/services/api-server/domain"
 	"go.mongodb.org/mongo-driver/bson"
@@ -14,6 +15,7 @@ import (
 type MongoRepository interface {
 	GetByJobId(jobId string, ctx context.Context) (*domain.Job, error)
 	SetJob(job *domain.Job, ctx context.Context) error
+	UpdateJob(job *domain.Job, ctx context.Context) error
 }
 
 type mongoRepository struct {
@@ -53,5 +55,12 @@ func (repo *mongoRepository) SetJob(job *domain.Job, ctx context.Context) error 
 	}
 	job.Id = oid.Hex()
 
+	return nil
+}
+
+func (repo *mongoRepository) UpdateJob(job *domain.Job, ctx context.Context) error {
+
+	res := repo.collection.FindOneAndUpdate(ctx, bson.M{"jobId": job.JobId}, bson.M{"status": job.Status})
+	fmt.Println(res)
 	return nil
 }

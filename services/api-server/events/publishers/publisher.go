@@ -1,14 +1,15 @@
-package events
+package publishers
 
 import (
 	"encoding/json"
 	"log"
 
+	"github.com/bogdan-copocean/hasty-server/services/api-server/events"
 	"github.com/nats-io/stan.go"
 )
 
 type NatsPublisherInterface interface {
-	PublishData(event JobEvent, doneCh chan<- struct{}, errChan chan<- error)
+	PublishData(event events.JobEvent, doneCh chan<- struct{}, errChan chan<- error)
 }
 
 type natsPublisher struct {
@@ -23,7 +24,7 @@ func NewNatsPublisher(client stan.Conn, subject string) NatsPublisherInterface {
 	}
 }
 
-func (nl *natsPublisher) PublishData(event JobEvent, doneCh chan<- struct{}, errChan chan<- error) {
+func (nl *natsPublisher) PublishData(event events.JobEvent, doneCh chan<- struct{}, errChan chan<- error) {
 
 	data, err := json.Marshal(event)
 	if err != nil {

@@ -9,6 +9,7 @@ import (
 
 	"github.com/bogdan-copocean/hasty-server/services/api-server/domain"
 	"github.com/bogdan-copocean/hasty-server/services/api-server/events"
+	"github.com/bogdan-copocean/hasty-server/services/api-server/events/publishers"
 	"github.com/bogdan-copocean/hasty-server/services/api-server/repository"
 )
 
@@ -20,10 +21,10 @@ type HandlerInterface interface {
 
 type handler struct {
 	mongoRepository repository.MongoRepository
-	natsPub         events.NatsPublisherInterface
+	natsPub         publishers.NatsPublisherInterface
 }
 
-func NewHandler(mongoRepository repository.MongoRepository, natsPub events.NatsPublisherInterface) HandlerInterface {
+func NewHandler(mongoRepository repository.MongoRepository, natsPub publishers.NatsPublisherInterface) HandlerInterface {
 	return &handler{mongoRepository: mongoRepository, natsPub: natsPub}
 }
 

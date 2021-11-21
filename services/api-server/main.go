@@ -6,6 +6,7 @@ import (
 	"os"
 
 	"github.com/bogdan-copocean/hasty-server/services/api-server/events"
+	"github.com/bogdan-copocean/hasty-server/services/api-server/events/publishers"
 	"github.com/bogdan-copocean/hasty-server/services/api-server/interfaces"
 	"github.com/bogdan-copocean/hasty-server/services/api-server/repository"
 	"github.com/go-chi/chi/v5"
@@ -23,7 +24,7 @@ func main() {
 
 	// Nats
 	natsConn := events.ConnectToNats(clientId)
-	publisher := events.NewNatsPublisher(natsConn, "job:created")
+	publisher := publishers.NewNatsPublisher(natsConn, "job:created")
 
 	repo := repository.ConnectToMongo()
 	handler := interfaces.NewHandler(repo, publisher)
