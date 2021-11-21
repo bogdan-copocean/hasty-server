@@ -14,8 +14,8 @@ func ConnectToMongo() MongoRepository {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
-	// client, err := mongo.Connect(ctx, options.Client().ApplyURI("mongodb://mongo_db:27017"))
-	client, err := mongo.Connect(ctx, options.Client().ApplyURI("mongodb://localhost:27017"))
+	client, err := mongo.Connect(ctx, options.Client().ApplyURI("mongodb://api_mongo_db:27017"))
+	// client, err := mongo.Connect(ctx, options.Client().ApplyURI("mongodb://localhost:27017"))
 	if err != nil {
 		log.Fatal(err)
 	}

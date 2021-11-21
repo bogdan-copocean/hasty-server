@@ -25,7 +25,7 @@ func main() {
 	repo := repository.ConnectToMongo()
 
 	// Nats
-	conn := events.ConnectToNats(clientId + "asoda")
+	conn := events.ConnectToNats(clientId)
 
 	listenerSubject := "job:created"
 	listenerQueueGroupName := "job-created-group"

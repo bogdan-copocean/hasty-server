@@ -1,28 +1,72 @@
 version: '3'
 
 services:
-  mongo_db:
-    image: mongo
+  api_mongo_db:
+    image: mongo:latest
     restart: always
-    ports:
-      - 27017:27017
     expose:
       - 27017
     volumes:
-      - mongo-data:/data/configdb
+      - api_mongo-data:/data/db
+    networks:
+      - hasty-network
+
+  api_server:
+    build:
+      context: ../..
+      dockerfile: services/api-server/Dockerfile
+    restart: always
+    expose:
+      - 9090
+    ports:
+      - 9090:9090
+    depends_on:
+      - "api_mongo_db"
+      - "nats-streaming"
+    networks:
+      - hasty-network
+
+  job_mongo_db:
+    image: mongo:latest
+    restart: always
+    expose:
+      - 27017
+    volumes:
+      - job_mongo-data:/data/db
+    networks:
+      - hasty-network
+
+  job_server:
+    build:
+      context: ../..
+      dockerfile: services/job-server/Dockerfile
+    restart: always
+    expose:
+      - 9091
+    ports:
+      - 9091:9091
+    depends_on:
+      - "job_mongo_db"
+      - "nats-streaming"
+    networks:
+      - hasty-network
+
   mongo_express:
-    image: mongo-express
+    image: mongo-express:latest
     ports:
       - 8081:8081
     environment:
-      - ME_CONFIG_MONGODB_SERVER=mongo_db
+      - ME_CONFIG_MONGODB_SERVER=api_mongo_db
     depends_on:
-      - mongo_db
+      - api_mongo_db
+    networks:
+      - hasty-network
 
   nats-streaming:
     image: 'nats-streaming:latest'
-    # expose:
-    #   - "4222"
+    expose:
+      - 8222
+      - 4222
     ports:
       - "8222:8222"
       - "4222:4222"
@@ -32,6 +76,10 @@ services:
         "4222",
         "-m",
         "8222",
+        "-store",
+        "file",
+        "-dir",
+        "datastore",
         "-hbi",
         "5s",
         "-hbt",
@@ -42,16 +90,26 @@ services:
         "-cid",
         "test-cluster"
       ]
-  # api_server:
-  #   build:
-  #     context: ../..
-  #     dockerfile: services/api-server/Dockerfile
-  #   restart: always
-  #   ports:
-  #     - 9090:9090
-  #   depends_on:
-  #     - "mongo_db"
-  #     - "nats"
+    volumes:
+      - nats-data:/datastore
+    networks:
+      - hasty-network
+
+  nginx:
+    image: nginx:latest
+    restart: always
+    ports:
+      - "80:80"
+    depends_on:
+      - go_service
+    volumes:
+      - ../nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+    networks:
+      - hasty-network
 
 volumes:
-  mongo-data: null
+  api_mongo-data: null
+  job_mongo-data: null
+  nats-data: null
+networks:
+  hasty-network: null
