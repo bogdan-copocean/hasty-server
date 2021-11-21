@@ -37,9 +37,7 @@ func (handler *handler) PostHandler(w http.ResponseWriter, r *http.Request) {
 	doneCh := make(chan struct{})
 	errCh := make(chan error)
 
-	objectIdMap := map[string]string{
-		"object_id": "",
-	}
+	objectIdMap := map[string]string{}
 
 	body, _ := io.ReadAll(r.Body)
 	defer r.Body.Close()

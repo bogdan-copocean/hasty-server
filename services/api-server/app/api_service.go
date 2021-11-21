@@ -39,7 +39,7 @@ func (as *apiService) ProcessJob(objectId string) (*domain.Job, error) {
 		}
 
 		foundJob.JobId = uuid.New().String()
-		foundJob.Status = "pending"
+		foundJob.Status = "processing"
 		foundJob.Timestamp = now
 
 		if err = as.mongoRepo.SetJob(foundJob); err != nil {
@@ -53,7 +53,7 @@ func (as *apiService) ProcessJob(objectId string) (*domain.Job, error) {
 	newJob := domain.Job{}
 
 	newJob.JobId = uuid.New().String()
-	newJob.Status = "pending"
+	newJob.Status = "processing"
 	newJob.Timestamp = now
 	newJob.ObjectId = objectId
 

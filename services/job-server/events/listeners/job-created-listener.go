@@ -52,12 +52,13 @@ func (nl *natsListener) ListenAndPublish(pubSubject string) {
 			fmt.Println("sleeping...", sleepTimeUsed)
 			jobEvent.SleepTimeUsed = sleepTimeUsed
 
+			time.Sleep(time.Duration(sleepTimeUsed) * time.Second)
+
 			if err := nl.repository.SetJob(&jobEvent); err != nil {
 				log.Printf("could not insert to repo: %v\n", err.Error())
 				return
 			}
 
-			time.Sleep(time.Duration(sleepTimeUsed) * time.Second)
 			fmt.Println("done sleeping", sleepTimeUsed)
 
 			jobEventBytes, err := json.Marshal(&jobEvent)
