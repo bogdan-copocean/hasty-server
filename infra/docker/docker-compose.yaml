@@ -1,0 +1,57 @@
+version: '3'
+
+services:
+  mongo_db:
+    image: mongo
+    restart: always
+    ports:
+      - 27017:27017
+    expose:
+      - 27017
+    volumes:
+      - mongo-data:/data/configdb
+  mongo_express:
+    image: mongo-express
+    ports:
+      - 8081:8081
+    environment:
+      - ME_CONFIG_MONGODB_SERVER=mongo_db
+    depends_on:
+      - mongo_db
+
+  nats-streaming:
+    image: 'nats-streaming:latest'
+    # expose:
+    #   - "4222"
+    ports:
+      - "8222:8222"
+      - "4222:4222"
+    command:
+      [
+        "-p",
+        "4222",
+        "-m",
+        "8222",
+        "-hbi",
+        "5s",
+        "-hbt",
+        "5s",
+        "-hbf",
+        "2",
+        "-SD",
+        "-cid",
+        "test-cluster"
+      ]
+  # api_server:
+  #   build:
+  #     context: ../..
+  #     dockerfile: services/api-server/Dockerfile
+  #   restart: always
+  #   ports:
+  #     - 9090:9090
+  #   depends_on:
+  #     - "mongo_db"
+  #     - "nats"
+
+volumes:
+  mongo-data: null
