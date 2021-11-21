@@ -45,7 +45,7 @@ func main() {
 
 	r.Post("/", handler.PostHandler)
 	r.Put("/", handler.PutHandler)
-	r.Get("/", handler.GetHandler)
+	r.Get("/{objectId}", handler.GetHandler)
 
 	http.ListenAndServe(":9090", r)
 }

@@ -13,6 +13,7 @@ import (
 type ApiService interface {
 	ProcessJob(objectId string) (*domain.Job, error)
 	UpdateJob(job *domain.Job) error
+	GetJob(objectId string) (*domain.Job, error)
 }
 
 type apiService struct {
@@ -69,4 +70,18 @@ func (as *apiService) UpdateJob(job *domain.Job) error {
 		return err
 	}
 	return nil
+}
+
+func (as *apiService) GetJob(objectId string) (*domain.Job, error) {
+	job, err := as.mongoRepo.GetJobByObjectId(objectId)
+
+	if err != nil {
+		if err == mongo.ErrNoDocuments {
+			return nil, fmt.Errorf("no job with id: %v", objectId)
+		}
+		return nil, err
+	}
+	job.Id = ""
+
+	return job, nil
 }

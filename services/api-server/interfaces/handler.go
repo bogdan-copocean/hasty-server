@@ -11,6 +11,7 @@ import (
 	"github.com/bogdan-copocean/hasty-server/services/api-server/app"
 	"github.com/bogdan-copocean/hasty-server/services/api-server/events"
 	"github.com/bogdan-copocean/hasty-server/services/api-server/events/publishers"
+	"github.com/go-chi/chi/v5"
 )
 
 type HandlerInterface interface {
@@ -97,5 +98,18 @@ func (handler *handler) PutHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func (handler *handler) GetHandler(w http.ResponseWriter, r *http.Request) {
-	w.Write([]byte("Get"))
+	w.Header().Set("Content-Type", "application/json")
+
+	objectId := chi.URLParam(r, "objectId")
+
+	job, err := handler.apiService.GetJob(objectId)
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		w.Write([]byte(err.Error()))
+		return
+	}
+
+	w.WriteHeader(http.StatusOK)
+	res, _ := json.Marshal(job)
+	w.Write(res)
 }
