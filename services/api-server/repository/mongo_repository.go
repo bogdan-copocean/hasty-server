@@ -6,16 +6,16 @@ import (
 	"time"
 
 	"github.com/bogdan-copocean/hasty-server/services/api-server/domain"
-	"github.com/google/uuid"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
+	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
 type MongoRepository interface {
-	GetJobByObjectId(jobId string) (*domain.Job, error)
+	GetJobByObjectId(objectId string) (*domain.Job, error)
 	SetJob(job *domain.Job) error
-	UpdateJob(job *domain.Job) error
+	UpdateJobStatus(job *domain.Job) error
 }
 
 type mongoRepository struct {
@@ -33,7 +33,8 @@ func (repo *mongoRepository) GetJobByObjectId(objectId string) (*domain.Job, err
 
 	job := domain.Job{}
 
-	if err := repo.collection.FindOne(ctx, bson.M{"objectId": objectId}).Decode(&job); err != nil {
+	opts := options.FindOne().SetSort(bson.M{"timestamp": -1})
+	if err := repo.collection.FindOne(ctx, bson.M{"objectId": objectId}, opts).Decode(&job); err != nil {
 		return nil, err
 	}
 
@@ -44,15 +45,11 @@ func (repo *mongoRepository) SetJob(job *domain.Job) error {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
-	jobIdUuid := uuid.New().String()
-	now := time.Now().Unix()
-	status := "pending"
-
 	res, err := repo.collection.InsertOne(ctx, bson.M{
-		"jobId":     jobIdUuid,
+		"jobId":     job.JobId,
 		"objectId":  job.ObjectId,
-		"status":    status,
-		"timestamp": now,
+		"status":    job.Status,
+		"timestamp": job.Timestamp,
 	})
 
 	if err != nil {
@@ -64,14 +61,11 @@ func (repo *mongoRepository) SetJob(job *domain.Job) error {
 		return errors.New("could not type assert oid")
 	}
 	job.Id = oid.Hex()
-	job.JobId = jobIdUuid
-	job.Timestamp = now
-	job.Status = status
 
 	return nil
 }
 
-func (repo *mongoRepository) UpdateJob(job *domain.Job) error {
+func (repo *mongoRepository) UpdateJobStatus(job *domain.Job) error {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 

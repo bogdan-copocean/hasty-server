@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"os"
 
+	"github.com/bogdan-copocean/hasty-server/services/api-server/app"
 	"github.com/bogdan-copocean/hasty-server/services/api-server/events"
 	"github.com/bogdan-copocean/hasty-server/services/api-server/events/listeners"
 	"github.com/bogdan-copocean/hasty-server/services/api-server/events/publishers"
@@ -26,17 +27,21 @@ func main() {
 	// Mongo Repository
 	repo := repository.ConnectToMongo()
 
+	// Services
+	service := app.NewApiService(repo)
+
 	// Nats
 	conn := events.ConnectToNats(clientId)
 	publisher := publishers.NewNatsPublisher(conn, "job:created")
 
 	listenerSubject := "job:finished"
 	listenerQueueGroup := "job-finished-group"
-	listener := listeners.NewJobFinishedListener(conn, listenerSubject, listenerQueueGroup, repo)
+	listener := listeners.NewJobFinishedListener(conn, listenerSubject, listenerQueueGroup, service)
 
 	listener.Listen(listenerSubject)
+
 	// Handlers
-	handler := interfaces.NewHandler(repo, publisher)
+	handler := interfaces.NewHandler(service, publisher)
 
 	r.Post("/", handler.PostHandler)
 	r.Put("/", handler.PutHandler)

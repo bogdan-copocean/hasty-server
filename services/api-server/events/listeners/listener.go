@@ -5,8 +5,8 @@ import (
 	"log"
 	"time"
 
+	"github.com/bogdan-copocean/hasty-server/services/api-server/app"
 	"github.com/bogdan-copocean/hasty-server/services/api-server/events"
-	"github.com/bogdan-copocean/hasty-server/services/api-server/repository"
 	"github.com/nats-io/stan.go"
 )
 
@@ -18,15 +18,15 @@ type natsListener struct {
 	client         stan.Conn
 	subject        string
 	queueGroupName string
-	repository     repository.MongoRepository
+	apiService     app.ApiService
 }
 
-func NewJobFinishedListener(client stan.Conn, subject, queueGroupName string, repository repository.MongoRepository) NatsListenerInterface {
+func NewJobFinishedListener(client stan.Conn, subject, queueGroupName string, apiService app.ApiService) NatsListenerInterface {
 	return &natsListener{
 		client:         client,
 		queueGroupName: queueGroupName,
 		subject:        subject,
-		repository:     repository,
+		apiService:     apiService,
 	}
 }
 
@@ -42,7 +42,7 @@ func (nl *natsListener) Listen(pubSubject string) {
 		}
 
 		go func() {
-			if err := nl.repository.UpdateJob(&jobEvent.Job); err != nil {
+			if err := nl.apiService.UpdateJob(jobEvent.Job); err != nil {
 				log.Printf("could not update to repo: %v\n", err.Error())
 				return
 			}

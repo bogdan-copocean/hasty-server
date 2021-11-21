@@ -8,11 +8,9 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/bogdan-copocean/hasty-server/services/api-server/domain"
+	"github.com/bogdan-copocean/hasty-server/services/api-server/app"
 	"github.com/bogdan-copocean/hasty-server/services/api-server/events"
 	"github.com/bogdan-copocean/hasty-server/services/api-server/events/publishers"
-	"github.com/bogdan-copocean/hasty-server/services/api-server/repository"
-	"go.mongodb.org/mongo-driver/mongo"
 )
 
 type HandlerInterface interface {
@@ -22,12 +20,12 @@ type HandlerInterface interface {
 }
 
 type handler struct {
-	mongoRepository repository.MongoRepository
-	natsPub         publishers.NatsPublisherInterface
+	apiService app.ApiService
+	natsPub    publishers.NatsPublisherInterface
 }
 
-func NewHandler(mongoRepository repository.MongoRepository, natsPub publishers.NatsPublisherInterface) HandlerInterface {
-	return &handler{mongoRepository: mongoRepository, natsPub: natsPub}
+func NewHandler(apiService app.ApiService, natsPub publishers.NatsPublisherInterface) HandlerInterface {
+	return &handler{apiService: apiService, natsPub: natsPub}
 }
 
 func (handler *handler) PostHandler(w http.ResponseWriter, r *http.Request) {
@@ -39,44 +37,30 @@ func (handler *handler) PostHandler(w http.ResponseWriter, r *http.Request) {
 	doneCh := make(chan struct{})
 	errCh := make(chan error)
 
-	job := domain.Job{}
+	objectIdMap := map[string]string{
+		"object_id": "",
+	}
+
 	body, _ := io.ReadAll(r.Body)
 	defer r.Body.Close()
 
-	if err := json.Unmarshal(body, &job); err != nil {
+	if err := json.Unmarshal(body, &objectIdMap); err != nil {
 		w.WriteHeader(http.StatusBadRequest)
-		res, _ := json.Marshal(err.Error())
+		res, _ := json.Marshal(fmt.Errorf("unmarshal error: %v", err.Error()))
 		w.Write(res)
 		return
 	}
+	objectId, ok := objectIdMap["object_id"]
+	if !ok {
+		w.WriteHeader(http.StatusBadRequest)
+		w.Write([]byte("could not get objectId from map"))
+		return
+	}
 
-	foundJob, err := handler.mongoRepository.GetJobByObjectId(job.ObjectId)
-	if err != nil && err != mongo.ErrNoDocuments {
-		w.WriteHeader(http.StatusInternalServerError)
+	job, err := handler.apiService.ProcessJob(objectId)
+	if err != nil {
+		w.WriteHeader(http.StatusBadRequest)
 		w.Write([]byte(err.Error()))
-		return
-	}
-
-	if foundJob != nil {
-		now := time.Now().Unix()
-		timeSinceCreated := now - foundJob.Timestamp
-
-		if timeSinceCreated < 300 {
-			w.WriteHeader(http.StatusBadRequest)
-			msg := map[string]string{
-				"message": fmt.Sprintf("you already requested the job: %v in the last 5 minutes", foundJob.ObjectId),
-			}
-			res, _ := json.Marshal(msg)
-			w.Write([]byte(res))
-			return
-		}
-
-	}
-
-	if err := handler.mongoRepository.SetJob(&job); err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
-		res, _ := json.Marshal(err.Error())
-		w.Write(res)
 		return
 	}
 
