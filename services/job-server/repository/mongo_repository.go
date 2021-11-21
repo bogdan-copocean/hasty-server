@@ -10,7 +10,6 @@ import (
 )
 
 type MongoRepository interface {
-	// GetByJobId(jobId string, ctx context.Context) (*events.JobEvent, error)
 	SetJob(*events.JobEvent, context.Context) error
 }
 
@@ -23,16 +22,6 @@ func NewMongoRepository(client *mongo.Client, collection *mongo.Collection) Mong
 	return &mongoRepository{client: client, collection: collection}
 }
 
-// func (repo *mongoRepository) GetByJobId(jobId string, ctx context.Context) (*events.JobEvent, error) {
-// 	// job := domain.Job{}
-
-// 	// if err := repo.collection.FindOne(ctx, bson.M{"jobId": jobId}).Decode(&job); err != nil {
-// 	// 	return nil, err
-// 	// }
-
-// 	// return &job, nil
-// }
-
 func (repo *mongoRepository) SetJob(jobEvent *events.JobEvent, ctx context.Context) error {
 
 	jobIdUuid, err := uuid.New()
@@ -40,7 +29,7 @@ func (repo *mongoRepository) SetJob(jobEvent *events.JobEvent, ctx context.Conte
 		return err
 	}
 
-	_, err = repo.collection.InsertOne(ctx, bson.M{"jobId": jobIdUuid, "objectId": jobEvent.Job.ObjectId, "sleepTimeUsed": jobEvent.SleepTimeUsed, "status": "DONE"})
+	_, err = repo.collection.InsertOne(ctx, bson.M{"jobId": jobIdUuid, "objectId": jobEvent.Job.ObjectId, "sleepTimeUsed": jobEvent.SleepTimeUsed, "status": "Finished"})
 	if err != nil {
 		return err
 	}
