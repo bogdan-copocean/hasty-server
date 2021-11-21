@@ -13,7 +13,7 @@ import (
 )
 
 type MongoRepository interface {
-	GetByJobId(jobId string) (*domain.Job, error)
+	GetJobByObjectId(jobId string) (*domain.Job, error)
 	SetJob(job *domain.Job) error
 	UpdateJob(job *domain.Job) error
 }
@@ -27,13 +27,13 @@ func NewMongoRepository(client *mongo.Client, collection *mongo.Collection) Mong
 	return &mongoRepository{client: client, collection: collection}
 }
 
-func (repo *mongoRepository) GetByJobId(jobId string) (*domain.Job, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), 50*time.Second)
+func (repo *mongoRepository) GetJobByObjectId(objectId string) (*domain.Job, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
 	job := domain.Job{}
 
-	if err := repo.collection.FindOne(ctx, bson.M{"jobId": jobId}).Decode(&job); err != nil {
+	if err := repo.collection.FindOne(ctx, bson.M{"objectId": objectId}).Decode(&job); err != nil {
 		return nil, err
 	}
 
@@ -41,12 +41,20 @@ func (repo *mongoRepository) GetByJobId(jobId string) (*domain.Job, error) {
 }
 
 func (repo *mongoRepository) SetJob(job *domain.Job) error {
-	ctx, cancel := context.WithTimeout(context.Background(), 50*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
 	jobIdUuid := uuid.New().String()
+	now := time.Now().Unix()
+	status := "pending"
 
-	res, err := repo.collection.InsertOne(ctx, bson.M{"jobId": jobIdUuid, "objectId": job.ObjectId, "metadata": "metadata", "status": "pending"})
+	res, err := repo.collection.InsertOne(ctx, bson.M{
+		"jobId":     jobIdUuid,
+		"objectId":  job.ObjectId,
+		"status":    status,
+		"timestamp": now,
+	})
+
 	if err != nil {
 		return err
 	}
@@ -57,6 +65,8 @@ func (repo *mongoRepository) SetJob(job *domain.Job) error {
 	}
 	job.Id = oid.Hex()
 	job.JobId = jobIdUuid
+	job.Timestamp = now
+	job.Status = status
 
 	return nil
 }

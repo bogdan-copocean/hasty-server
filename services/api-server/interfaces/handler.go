@@ -3,6 +3,7 @@ package interfaces
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"io"
 	"net/http"
 	"time"
@@ -11,6 +12,7 @@ import (
 	"github.com/bogdan-copocean/hasty-server/services/api-server/events"
 	"github.com/bogdan-copocean/hasty-server/services/api-server/events/publishers"
 	"github.com/bogdan-copocean/hasty-server/services/api-server/repository"
+	"go.mongodb.org/mongo-driver/mongo"
 )
 
 type HandlerInterface interface {
@@ -46,6 +48,29 @@ func (handler *handler) PostHandler(w http.ResponseWriter, r *http.Request) {
 		res, _ := json.Marshal(err.Error())
 		w.Write(res)
 		return
+	}
+
+	foundJob, err := handler.mongoRepository.GetJobByObjectId(job.ObjectId)
+	if err != nil && err != mongo.ErrNoDocuments {
+		w.WriteHeader(http.StatusInternalServerError)
+		w.Write([]byte(err.Error()))
+		return
+	}
+
+	if foundJob != nil {
+		now := time.Now().Unix()
+		timeSinceCreated := now - foundJob.Timestamp
+
+		if timeSinceCreated < 300 {
+			w.WriteHeader(http.StatusBadRequest)
+			msg := map[string]string{
+				"message": fmt.Sprintf("you already requested the job: %v in the last 5 minutes", foundJob.ObjectId),
+			}
+			res, _ := json.Marshal(msg)
+			w.Write([]byte(res))
+			return
+		}
+
 	}
 
 	if err := handler.mongoRepository.SetJob(&job); err != nil {
