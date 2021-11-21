@@ -6,6 +6,7 @@ import (
 	"os"
 
 	"github.com/bogdan-copocean/hasty-server/services/api-server/events"
+	"github.com/bogdan-copocean/hasty-server/services/api-server/events/listeners"
 	"github.com/bogdan-copocean/hasty-server/services/api-server/events/publishers"
 	"github.com/bogdan-copocean/hasty-server/services/api-server/interfaces"
 	"github.com/bogdan-copocean/hasty-server/services/api-server/repository"
@@ -22,14 +23,21 @@ func main() {
 		log.Fatalf("could not get the host name: %v\n", err)
 	}
 
-	// Nats
-	natsConn := events.ConnectToNats(clientId)
-	publisher := publishers.NewNatsPublisher(natsConn, "job:created")
-
+	// Mongo Repository
 	repo := repository.ConnectToMongo()
+
+	// Nats
+	conn := events.ConnectToNats(clientId)
+	publisher := publishers.NewNatsPublisher(conn, "job:created")
+
+	listenerSubject := "job:finished"
+	listenerQueueGroup := "job-finished-group"
+	listener := listeners.NewJobFinishedListener(conn, listenerSubject, listenerQueueGroup, repo)
+
+	listener.Listen(listenerSubject)
+	// Handlers
 	handler := interfaces.NewHandler(repo, publisher)
 
-	// Handlers
 	r.Post("/", handler.PostHandler)
 	r.Put("/", handler.PutHandler)
 	r.Get("/", handler.GetHandler)

@@ -1,11 +1,9 @@
 package main
 
 import (
-	"context"
 	"log"
 	"net/http"
 	"os"
-	"time"
 
 	"github.com/bogdan-copocean/hasty-server/services/job-server/events"
 	"github.com/bogdan-copocean/hasty-server/services/job-server/events/listeners"
@@ -17,9 +15,6 @@ import (
 func main() {
 	r := chi.NewRouter()
 	r.Use(middleware.Logger)
-
-	ctx, cancel := context.WithTimeout(context.Background(), 47*time.Second)
-	defer cancel()
 
 	clientId, err := os.Hostname()
 	if err != nil {
@@ -39,7 +34,7 @@ func main() {
 
 	publishSubject := "job:finished"
 	// Listen and publish events
-	listener.ListenAndPublish(publishSubject, ctx)
+	listener.ListenAndPublish(publishSubject)
 
 	http.ListenAndServe(":9091", r)
 }

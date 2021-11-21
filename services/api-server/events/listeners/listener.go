@@ -1,7 +1,6 @@
 package listeners
 
 import (
-	"context"
 	"encoding/json"
 	"log"
 	"time"
@@ -12,7 +11,7 @@ import (
 )
 
 type NatsListenerInterface interface {
-	Listen(pubSubject string, ctx context.Context)
+	Listen(pubSubject string)
 }
 
 type natsListener struct {
@@ -31,7 +30,7 @@ func NewJobFinishedListener(client stan.Conn, subject, queueGroupName string, re
 	}
 }
 
-func (nl *natsListener) Listen(pubSubject string, ctx context.Context) {
+func (nl *natsListener) Listen(pubSubject string) {
 
 	msgHandler := func(msg *stan.Msg) {
 
@@ -43,9 +42,8 @@ func (nl *natsListener) Listen(pubSubject string, ctx context.Context) {
 		}
 
 		go func() {
-
-			if err := nl.repository.UpdateJob(&jobEvent.Job, ctx); err != nil {
-				log.Printf("could not insert to repo: %v\n", err.Error())
+			if err := nl.repository.UpdateJob(&jobEvent.Job); err != nil {
+				log.Printf("could not update to repo: %v\n", err.Error())
 				return
 			}
 
@@ -59,7 +57,7 @@ func (nl *natsListener) Listen(pubSubject string, ctx context.Context) {
 		stan.SetManualAckMode(),
 		stan.AckWait(aw),
 		stan.DeliverAllAvailable(),
-		stan.DurableName("job-created-durable-name"),
+		stan.DurableName("job-finished-durable-name"),
 	)
 
 	if err != nil {

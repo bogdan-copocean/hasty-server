@@ -1,7 +1,6 @@
 package listeners
 
 import (
-	"context"
 	"encoding/json"
 	"fmt"
 	"log"
@@ -14,7 +13,7 @@ import (
 )
 
 type NatsListenerInterface interface {
-	ListenAndPublish(pubSubject string, ctx context.Context)
+	ListenAndPublish(pubSubject string)
 }
 
 type natsListener struct {
@@ -33,7 +32,7 @@ func NewJobCreatedListener(client stan.Conn, subject, queueGroupName string, rep
 	}
 }
 
-func (nl *natsListener) ListenAndPublish(pubSubject string, ctx context.Context) {
+func (nl *natsListener) ListenAndPublish(pubSubject string) {
 	minSleepTime := 15
 	maxSleepTime := 45
 
@@ -52,9 +51,8 @@ func (nl *natsListener) ListenAndPublish(pubSubject string, ctx context.Context)
 
 			fmt.Println("sleeping...", sleepTimeUsed)
 			jobEvent.SleepTimeUsed = sleepTimeUsed
-			fmt.Println(jobEvent)
 
-			if err := nl.repository.SetJob(&jobEvent, ctx); err != nil {
+			if err := nl.repository.SetJob(&jobEvent); err != nil {
 				log.Printf("could not insert to repo: %v\n", err.Error())
 				return
 			}

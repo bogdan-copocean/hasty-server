@@ -3,19 +3,19 @@ package repository
 import (
 	"context"
 	"errors"
-	"fmt"
+	"time"
 
 	"github.com/bogdan-copocean/hasty-server/services/api-server/domain"
+	"github.com/google/uuid"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
-	"go.mongodb.org/mongo-driver/x/mongo/driver/uuid"
 )
 
 type MongoRepository interface {
-	GetByJobId(jobId string, ctx context.Context) (*domain.Job, error)
-	SetJob(job *domain.Job, ctx context.Context) error
-	UpdateJob(job *domain.Job, ctx context.Context) error
+	GetByJobId(jobId string) (*domain.Job, error)
+	SetJob(job *domain.Job) error
+	UpdateJob(job *domain.Job) error
 }
 
 type mongoRepository struct {
@@ -27,7 +27,10 @@ func NewMongoRepository(client *mongo.Client, collection *mongo.Collection) Mong
 	return &mongoRepository{client: client, collection: collection}
 }
 
-func (repo *mongoRepository) GetByJobId(jobId string, ctx context.Context) (*domain.Job, error) {
+func (repo *mongoRepository) GetByJobId(jobId string) (*domain.Job, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), 50*time.Second)
+	defer cancel()
+
 	job := domain.Job{}
 
 	if err := repo.collection.FindOne(ctx, bson.M{"jobId": jobId}).Decode(&job); err != nil {
@@ -37,12 +40,11 @@ func (repo *mongoRepository) GetByJobId(jobId string, ctx context.Context) (*dom
 	return &job, nil
 }
 
-func (repo *mongoRepository) SetJob(job *domain.Job, ctx context.Context) error {
+func (repo *mongoRepository) SetJob(job *domain.Job) error {
+	ctx, cancel := context.WithTimeout(context.Background(), 50*time.Second)
+	defer cancel()
 
-	jobIdUuid, err := uuid.New()
-	if err != nil {
-		return err
-	}
+	jobIdUuid := uuid.New().String()
 
 	res, err := repo.collection.InsertOne(ctx, bson.M{"jobId": jobIdUuid, "objectId": job.ObjectId, "metadata": "metadata", "status": "pending"})
 	if err != nil {
@@ -54,13 +56,18 @@ func (repo *mongoRepository) SetJob(job *domain.Job, ctx context.Context) error 
 		return errors.New("could not type assert oid")
 	}
 	job.Id = oid.Hex()
+	job.JobId = jobIdUuid
 
 	return nil
 }
 
-func (repo *mongoRepository) UpdateJob(job *domain.Job, ctx context.Context) error {
+func (repo *mongoRepository) UpdateJob(job *domain.Job) error {
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
 
-	res := repo.collection.FindOneAndUpdate(ctx, bson.M{"jobId": job.JobId}, bson.M{"status": job.Status})
-	fmt.Println(res)
+	if err := repo.collection.FindOneAndUpdate(ctx, bson.M{"jobId": job.JobId}, bson.M{"$set": bson.M{"status": job.Status}}).Err(); err != nil {
+		return err
+	}
+
 	return nil
 }

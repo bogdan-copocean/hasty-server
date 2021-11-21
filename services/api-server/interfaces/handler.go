@@ -48,7 +48,7 @@ func (handler *handler) PostHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := handler.mongoRepository.SetJob(&job, ctx); err != nil {
+	if err := handler.mongoRepository.SetJob(&job); err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		res, _ := json.Marshal(err.Error())
 		w.Write(res)
@@ -60,7 +60,7 @@ func (handler *handler) PostHandler(w http.ResponseWriter, r *http.Request) {
 		Job:     job,
 	}
 
-	go handler.natsPub.PublishData(eventJob, doneCh, errCh)
+	go handler.natsPub.PublishData(&eventJob, doneCh, errCh)
 
 	for {
 		select {
