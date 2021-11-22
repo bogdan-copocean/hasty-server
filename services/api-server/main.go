@@ -50,7 +50,7 @@ func main() {
 	cancelledListener.Listen()
 
 	// Handlers
-	handler := interfaces.NewHandler(service, publisher)
+	handler := interfaces.NewApiHandler(service, publisher)
 
 	r.Post("/", handler.PostHandler)
 	r.Put("/", handler.PutHandler)

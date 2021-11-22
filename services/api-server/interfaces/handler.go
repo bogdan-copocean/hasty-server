@@ -2,7 +2,6 @@ package interfaces
 
 import (
 	"encoding/json"
-	"fmt"
 	"io"
 	"net/http"
 
@@ -10,24 +9,26 @@ import (
 	"github.com/bogdan-copocean/hasty-server/services/api-server/events"
 	"github.com/bogdan-copocean/hasty-server/services/api-server/events/publishers"
 	"github.com/go-chi/chi/v5"
+	"github.com/unrolled/render"
 )
 
-type HandlerInterface interface {
+type ApiHandlerInterface interface {
 	PostHandler(w http.ResponseWriter, r *http.Request)
 	PutHandler(w http.ResponseWriter, r *http.Request)
 	GetHandler(w http.ResponseWriter, r *http.Request)
 }
 
-type handler struct {
-	apiService app.ApiService
-	publisher  publishers.JobEventPublisher
+type apiHandler struct {
+	apiService        app.ApiService
+	jobEventPublisher publishers.JobEventPublisher
 }
 
-func NewHandler(apiService app.ApiService, publisher publishers.JobEventPublisher) HandlerInterface {
-	return &handler{apiService: apiService, publisher: publisher}
+func NewApiHandler(apiService app.ApiService, jobEventPublisher publishers.JobEventPublisher) ApiHandlerInterface {
+	return &apiHandler{apiService: apiService, jobEventPublisher: jobEventPublisher}
 }
 
-func (handler *handler) PostHandler(w http.ResponseWriter, r *http.Request) {
+func (handler *apiHandler) PostHandler(w http.ResponseWriter, r *http.Request) {
+	render := render.New()
 	w.Header().Set("Content-Type", "application/json")
 
 	objectIdMap := map[string]string{}
@@ -37,21 +38,26 @@ func (handler *handler) PostHandler(w http.ResponseWriter, r *http.Request) {
 
 	if err := json.Unmarshal(body, &objectIdMap); err != nil {
 		w.WriteHeader(http.StatusBadRequest)
-		res, _ := json.Marshal(fmt.Errorf("unmarshal error: %v", err.Error()))
-		w.Write(res)
+		render.JSON(w, http.StatusBadRequest, map[string]string{
+			"message": err.Error(),
+		})
 		return
 	}
 	objectId, ok := objectIdMap["object_id"]
 	if !ok {
 		w.WriteHeader(http.StatusBadRequest)
-		w.Write([]byte("could not get objectId from map"))
+		render.JSON(w, http.StatusBadRequest, map[string]string{
+			"message": "you must provide an object_id",
+		})
 		return
 	}
 
 	job, err := handler.apiService.ProcessJob(objectId)
 	if err != nil {
 		w.WriteHeader(http.StatusBadRequest)
-		w.Write([]byte(err.Error()))
+		render.JSON(w, http.StatusBadRequest, map[string]string{
+			"message": err.Error(),
+		})
 		return
 	}
 
@@ -60,34 +66,42 @@ func (handler *handler) PostHandler(w http.ResponseWriter, r *http.Request) {
 		Job:     job,
 	}
 
-	if err := handler.publisher.PublishData(&eventJob); err != nil {
+	if err := handler.jobEventPublisher.PublishData(&eventJob); err != nil {
 		w.WriteHeader(http.StatusBadRequest)
-		w.Write([]byte(err.Error()))
+		render.JSON(w, http.StatusBadRequest, map[string]string{
+			"message": err.Error(),
+		})
 		return
 	}
 
 	w.WriteHeader(http.StatusCreated)
-	w.Write([]byte("created"))
+	render.JSON(w, http.StatusCreated, map[string]interface{}{
+		"message": job,
+	})
 
 }
 
-func (handler *handler) PutHandler(w http.ResponseWriter, r *http.Request) {
+func (handler *apiHandler) PutHandler(w http.ResponseWriter, r *http.Request) {
 	w.Write([]byte("Put"))
 }
 
-func (handler *handler) GetHandler(w http.ResponseWriter, r *http.Request) {
+func (handler *apiHandler) GetHandler(w http.ResponseWriter, r *http.Request) {
+	render := render.New()
 	w.Header().Set("Content-Type", "application/json")
 
 	objectId := chi.URLParam(r, "objectId")
 
 	job, err := handler.apiService.GetJob(objectId)
 	if err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
-		w.Write([]byte(err.Error()))
+		w.WriteHeader(http.StatusBadRequest)
+		render.JSON(w, http.StatusBadRequest, map[string]string{
+			"message": err.Error(),
+		})
 		return
 	}
 
 	w.WriteHeader(http.StatusOK)
-	res, _ := json.Marshal(job)
-	w.Write(res)
+	render.JSON(w, http.StatusOK, map[string]interface{}{
+		"message": job,
+	})
 }

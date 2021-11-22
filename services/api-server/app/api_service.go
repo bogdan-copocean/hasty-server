@@ -36,7 +36,7 @@ func (as *apiService) ProcessJob(objectId string) (*domain.Job, error) {
 		timePassed := now - foundJob.Timestamp
 
 		if timePassed < 300 {
-			return nil, fmt.Errorf("5 minutes not passed yet")
+			return nil, fmt.Errorf("you need to wait 5 minutes before rerunning the same job")
 		}
 
 		foundJob.JobId = uuid.New().String()
@@ -44,7 +44,7 @@ func (as *apiService) ProcessJob(objectId string) (*domain.Job, error) {
 		foundJob.Timestamp = now
 
 		if err = as.mongoRepo.SetJob(foundJob); err != nil {
-			return nil, err
+			return nil, fmt.Errorf("could not set found job to mongo %v", err.Error())
 		}
 
 		return foundJob, nil
@@ -58,7 +58,7 @@ func (as *apiService) ProcessJob(objectId string) (*domain.Job, error) {
 	newJob.ObjectId = objectId
 
 	if err = as.mongoRepo.SetJob(&newJob); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("could not set new job to mongo %v", err.Error())
 	}
 
 	return &newJob, nil
@@ -66,7 +66,7 @@ func (as *apiService) ProcessJob(objectId string) (*domain.Job, error) {
 
 func (as *apiService) UpdateJob(job *domain.Job) error {
 	if err := as.mongoRepo.UpdateJobStatus(job); err != nil {
-		return err
+		return fmt.Errorf("could not update job to mongo %v", err.Error())
 	}
 	return nil
 }
@@ -78,9 +78,8 @@ func (as *apiService) GetJob(objectId string) (*domain.Job, error) {
 		if err == mongo.ErrNoDocuments {
 			return nil, fmt.Errorf("no job with id: %v", objectId)
 		}
-		return nil, err
+		return nil, fmt.Errorf("could not get job from mongo %v", err.Error())
 	}
-	job.Id = ""
 
 	return job, nil
 }
