@@ -24,7 +24,7 @@ func NewNatsPublisher(client stan.Conn, subject string) NatsPublisherInterface {
 }
 
 func (nl *natsPublisher) PublishData() {
-	if err := nl.Client.Publish(string(nl.Subject), nl.data); err != nil {
+	if err := nl.Client.Publish(nl.Subject, nl.data); err != nil {
 		log.Println(err)
 	}
 	log.Println("event published")

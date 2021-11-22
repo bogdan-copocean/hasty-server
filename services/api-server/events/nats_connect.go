@@ -9,6 +9,7 @@ import (
 func ConnectToNats(clientId string) stan.Conn {
 
 	url := "nats://nats-streaming:4222"
+	// url := "nats://localhost:4222"
 
 	sc, err := stan.Connect("test-cluster", clientId, stan.NatsURL(url),
 		stan.Pings(1, 3),

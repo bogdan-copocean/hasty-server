@@ -1,8 +1,8 @@
 package listeners
 
 import (
+	"context"
 	"encoding/json"
-	"fmt"
 	"log"
 	"math/rand"
 	"time"
@@ -12,8 +12,19 @@ import (
 	"github.com/nats-io/stan.go"
 )
 
+const (
+	JobFinishedSubject  = "job:finished"
+	JobCancelledSubject = "job:cancelled"
+)
+
+const (
+	MinSleepTime        = 15
+	MaxSleepTime        = 45
+	CancellationJobTime = 46 * time.Second
+)
+
 type NatsListenerInterface interface {
-	ListenAndPublish(pubSubject string)
+	ListenAndPublish()
 }
 
 type natsListener struct {
@@ -32,53 +43,13 @@ func NewJobCreatedListener(client stan.Conn, subject, queueGroupName string, rep
 	}
 }
 
-func (nl *natsListener) ListenAndPublish(pubSubject string) {
-	minSleepTime := 15
-	maxSleepTime := 45
-
-	msgHandler := func(msg *stan.Msg) {
-
-		jobEvent := events.JobEvent{}
-
-		err := json.Unmarshal(msg.Data, &jobEvent)
-		if err != nil {
-			log.Fatal(err.Error())
-		}
-
-		sleepTimeUsed := rand.Intn(maxSleepTime-minSleepTime) + minSleepTime
-
-		go func() {
-
-			fmt.Println("sleeping...", sleepTimeUsed)
-			jobEvent.SleepTimeUsed = sleepTimeUsed
-
-			time.Sleep(time.Duration(sleepTimeUsed) * time.Second)
-
-			if err := nl.repository.SetJob(&jobEvent); err != nil {
-				log.Printf("could not insert to repo: %v\n", err.Error())
-				return
-			}
-
-			fmt.Println("done sleeping", sleepTimeUsed)
-
-			jobEventBytes, err := json.Marshal(&jobEvent)
-			if err != nil {
-				log.Fatalf("could not marshal job event: %v\n", err)
-			}
-
-			// Publish job finished
-			if err := nl.client.Publish(pubSubject, jobEventBytes); err != nil {
-				log.Fatalf("could not publish event: %v\n", err)
-			}
-
-			msg.Ack()
-		}()
-
-	}
+func (nl *natsListener) ListenAndPublish() {
 
 	aw, _ := time.ParseDuration("50s")
 
-	_, err := nl.client.QueueSubscribe(nl.subject, nl.queueGroupName, msgHandler,
+	_, err := nl.client.QueueSubscribe(nl.subject, nl.queueGroupName, func(msg *stan.Msg) {
+		go msgHandler(msg, nl.client, nl.repository)
+	},
 		stan.SetManualAckMode(),
 		stan.AckWait(aw),
 		stan.DeliverAllAvailable(),
@@ -89,4 +60,71 @@ func (nl *natsListener) ListenAndPublish(pubSubject string) {
 		log.Fatalf("queue subscribe error: %v\n", err)
 	}
 
+}
+
+func msgHandler(msg *stan.Msg, client stan.Conn, repository repository.MongoRepository) {
+	jobEvent := events.JobEvent{}
+	doneCh := make(chan struct{})
+
+	// ctx to trigger cancellation inside sleeping goroutine
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	err := json.Unmarshal(msg.Data, &jobEvent)
+	if err != nil {
+		log.Fatal(err.Error())
+	}
+
+	sleepTimeUsed := rand.Intn(MaxSleepTime-MinSleepTime) + MinSleepTime
+	jobEvent.SleepTimeUsed = sleepTimeUsed
+
+	go func() {
+
+		time.Sleep(time.Duration(sleepTimeUsed) * time.Second)
+
+		select {
+		case <-ctx.Done():
+			jobEvent.Job.Status = "cancelled"
+			data, err := json.Marshal(&jobEvent)
+			if err != nil {
+				log.Fatalf("could not marshal cancelled msg data: %v", err.Error())
+			}
+
+			if err := repository.SetJob(&jobEvent); err != nil {
+				log.Fatalf("could not insert cancelled msg to repo: %v\n", err.Error())
+			}
+
+			// Publish job cancelled
+			if err := client.Publish(JobCancelledSubject, data); err != nil {
+				log.Fatalf("could not publish cancelled event: %v\n", err.Error())
+			}
+
+			msg.Ack()
+
+		default:
+			jobEvent.Job.Status = "finished"
+			data, err := json.Marshal(&jobEvent)
+			if err != nil {
+				log.Fatalf("could not marshal finished msg data: %v", err.Error())
+			}
+
+			if err := repository.SetJob(&jobEvent); err != nil {
+				log.Fatalf("could not insert finished msg to repo: %v\n", err.Error())
+			}
+
+			// Publish job finished
+			if err := client.Publish(JobFinishedSubject, data); err != nil {
+				log.Fatalf("could not publish finished event: %v\n", err.Error())
+			}
+			doneCh <- struct{}{}
+		}
+
+	}()
+
+	select {
+	case <-doneCh:
+		msg.Ack()
+	case <-time.After(CancellationJobTime):
+		return
+	}
 }

@@ -26,11 +26,10 @@ func (repo *mongoRepository) SetJob(jobEvent *events.JobEvent) error {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
-	_, err := repo.collection.InsertOne(ctx, bson.M{"jobId": jobEvent.Job.JobId, "objectId": jobEvent.Job.ObjectId, "sleepTimeUsed": jobEvent.SleepTimeUsed, "status": "finished"})
+	_, err := repo.collection.InsertOne(ctx, bson.M{"jobId": jobEvent.Job.JobId, "objectId": jobEvent.Job.ObjectId, "sleepTimeUsed": jobEvent.SleepTimeUsed, "status": jobEvent.Job.Status})
 	if err != nil {
 		return err
 	}
-	jobEvent.Job.Status = "finished"
 
 	return nil
 }

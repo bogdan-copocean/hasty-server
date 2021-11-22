@@ -25,16 +25,15 @@ func main() {
 	repo := repository.ConnectToMongo()
 
 	// Nats
-	conn := events.ConnectToNats(clientId)
+	conn := events.ConnectToNats(clientId + "1")
 
 	listenerSubject := "job:created"
 	listenerQueueGroupName := "job-created-group"
 	// Create Job Created Listener
 	listener := listeners.NewJobCreatedListener(conn, listenerSubject, listenerQueueGroupName, repo)
 
-	publishSubject := "job:finished"
 	// Listen and publish events
-	listener.ListenAndPublish(publishSubject)
+	listener.ListenAndPublish()
 
 	http.ListenAndServe(":9091", r)
 }
