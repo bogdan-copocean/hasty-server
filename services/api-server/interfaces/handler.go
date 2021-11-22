@@ -1,12 +1,10 @@
 package interfaces
 
 import (
-	"context"
 	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
-	"time"
 
 	"github.com/bogdan-copocean/hasty-server/services/api-server/app"
 	"github.com/bogdan-copocean/hasty-server/services/api-server/events"
@@ -22,21 +20,15 @@ type HandlerInterface interface {
 
 type handler struct {
 	apiService app.ApiService
-	natsPub    publishers.NatsPublisherInterface
+	publisher  publishers.JobEventPublisher
 }
 
-func NewHandler(apiService app.ApiService, natsPub publishers.NatsPublisherInterface) HandlerInterface {
-	return &handler{apiService: apiService, natsPub: natsPub}
+func NewHandler(apiService app.ApiService, publisher publishers.JobEventPublisher) HandlerInterface {
+	return &handler{apiService: apiService, publisher: publisher}
 }
 
 func (handler *handler) PostHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
-
-	ctx, cancel := context.WithTimeout(r.Context(), 800*time.Millisecond)
-	defer cancel()
-
-	doneCh := make(chan struct{})
-	errCh := make(chan error)
 
 	objectIdMap := map[string]string{}
 
@@ -68,28 +60,14 @@ func (handler *handler) PostHandler(w http.ResponseWriter, r *http.Request) {
 		Job:     job,
 	}
 
-	go handler.natsPub.PublishData(&eventJob, doneCh, errCh)
-
-	for {
-		select {
-		case <-doneCh:
-			w.WriteHeader(http.StatusCreated)
-			res, _ := json.Marshal(job)
-			w.Write(res)
-			return
-		case <-errCh:
-			w.WriteHeader(http.StatusInternalServerError)
-			res, _ := json.Marshal([]byte("something went wrong. please rerun the job"))
-			w.Write(res)
-			return
-		case <-ctx.Done():
-			w.WriteHeader(http.StatusInternalServerError)
-			res, _ := json.Marshal([]byte("timeout"))
-			w.Write(res)
-			return
-
-		}
+	if err := handler.publisher.PublishData(&eventJob); err != nil {
+		w.WriteHeader(http.StatusBadRequest)
+		w.Write([]byte(err.Error()))
+		return
 	}
+
+	w.WriteHeader(http.StatusCreated)
+	w.Write([]byte("created"))
 
 }
 

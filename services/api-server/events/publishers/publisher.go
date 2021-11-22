@@ -2,41 +2,38 @@ package publishers
 
 import (
 	"encoding/json"
-	"fmt"
+	"log"
 
 	"github.com/bogdan-copocean/hasty-server/services/api-server/events"
 	"github.com/nats-io/stan.go"
 )
 
-type NatsPublisherInterface interface {
-	PublishData(event *events.JobEvent, doneCh chan<- struct{}, errChan chan<- error)
+type JobEventPublisher interface {
+	PublishData(jobEvent *events.JobEvent) error
 }
 
-type natsPublisher struct {
+type jobEventPublisher struct {
 	Client  stan.Conn
 	Subject string
 }
 
-func NewNatsPublisher(client stan.Conn, subject string) NatsPublisherInterface {
-	return &natsPublisher{
+func NewJobEventPublisher(client stan.Conn, subject string) JobEventPublisher {
+	return &jobEventPublisher{
 		Client:  client,
 		Subject: subject,
 	}
 }
 
-func (nl *natsPublisher) PublishData(event *events.JobEvent, doneCh chan<- struct{}, errChan chan<- error) {
+func (nl *jobEventPublisher) PublishData(jobEvent *events.JobEvent) error {
 
-	data, err := json.Marshal(event)
+	data, err := json.Marshal(jobEvent)
 	if err != nil {
-		errChan <- err
-		close(errChan)
-	}
-	fmt.Println(string(data))
-	if err := nl.Client.Publish(nl.Subject, data); err != nil {
-		errChan <- err
-		close(errChan)
+		log.Fatalf("could not marshal event with jobId: %v, reason: %v", jobEvent.Job.Id, err.Error())
 	}
 
-	doneCh <- struct{}{}
-	close(doneCh)
+	if err := nl.Client.Publish(nl.Subject, data); err != nil {
+		return err
+	}
+
+	return nil
 }

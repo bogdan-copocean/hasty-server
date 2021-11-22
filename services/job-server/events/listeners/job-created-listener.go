@@ -8,13 +8,9 @@ import (
 	"time"
 
 	"github.com/bogdan-copocean/hasty-server/services/job-server/events"
+	"github.com/bogdan-copocean/hasty-server/services/job-server/events/publishers"
 	"github.com/bogdan-copocean/hasty-server/services/job-server/repository"
 	"github.com/nats-io/stan.go"
-)
-
-const (
-	JobFinishedSubject  = "job:finished"
-	JobCancelledSubject = "job:cancelled"
 )
 
 const (
@@ -28,18 +24,22 @@ type NatsListenerInterface interface {
 }
 
 type natsListener struct {
-	client         stan.Conn
-	subject        string
-	queueGroupName string
-	repository     repository.MongoRepository
+	client             stan.Conn
+	subject            string
+	queueGroupName     string
+	finishedPublisher  publishers.JobEventPublisher
+	cancelledPublisher publishers.JobEventPublisher
+	repository         repository.MongoRepository
 }
 
-func NewJobCreatedListener(client stan.Conn, subject, queueGroupName string, repository repository.MongoRepository) NatsListenerInterface {
+func NewJobCreatedListener(client stan.Conn, subject, queueGroupName string, finishedPublisher, cancelledPublisher publishers.JobEventPublisher, repository repository.MongoRepository) NatsListenerInterface {
 	return &natsListener{
-		client:         client,
-		queueGroupName: queueGroupName,
-		subject:        subject,
-		repository:     repository,
+		client:             client,
+		subject:            subject,
+		queueGroupName:     queueGroupName,
+		finishedPublisher:  finishedPublisher,
+		cancelledPublisher: cancelledPublisher,
+		repository:         repository,
 	}
 }
 
@@ -48,7 +48,7 @@ func (nl *natsListener) ListenAndPublish() {
 	aw, _ := time.ParseDuration("50s")
 
 	_, err := nl.client.QueueSubscribe(nl.subject, nl.queueGroupName, func(msg *stan.Msg) {
-		go msgHandler(msg, nl.client, nl.repository)
+		go msgHandler(msg, nl.client, nl.finishedPublisher, nl.cancelledPublisher, nl.repository)
 	},
 		stan.SetManualAckMode(),
 		stan.AckWait(aw),
@@ -62,7 +62,7 @@ func (nl *natsListener) ListenAndPublish() {
 
 }
 
-func msgHandler(msg *stan.Msg, client stan.Conn, repository repository.MongoRepository) {
+func msgHandler(msg *stan.Msg, client stan.Conn, finishedPublisher, cancelledPublisher publishers.JobEventPublisher, repository repository.MongoRepository) {
 	jobEvent := events.JobEvent{}
 	doneCh := make(chan struct{})
 
@@ -85,36 +85,28 @@ func msgHandler(msg *stan.Msg, client stan.Conn, repository repository.MongoRepo
 		select {
 		case <-ctx.Done():
 			jobEvent.Job.Status = "cancelled"
-			data, err := json.Marshal(&jobEvent)
-			if err != nil {
-				log.Fatalf("could not marshal cancelled msg data: %v", err.Error())
-			}
 
 			if err := repository.SetJob(&jobEvent); err != nil {
 				log.Fatalf("could not insert cancelled msg to repo: %v\n", err.Error())
 			}
 
 			// Publish job cancelled
-			if err := client.Publish(JobCancelledSubject, data); err != nil {
-				log.Fatalf("could not publish cancelled event: %v\n", err.Error())
+			if err := finishedPublisher.PublishData(&jobEvent); err != nil {
+				log.Fatalf("could not publish cancelled job event: %v", err.Error())
 			}
 
 			msg.Ack()
 
 		default:
 			jobEvent.Job.Status = "finished"
-			data, err := json.Marshal(&jobEvent)
-			if err != nil {
-				log.Fatalf("could not marshal finished msg data: %v", err.Error())
-			}
 
 			if err := repository.SetJob(&jobEvent); err != nil {
 				log.Fatalf("could not insert finished msg to repo: %v\n", err.Error())
 			}
 
 			// Publish job finished
-			if err := client.Publish(JobFinishedSubject, data); err != nil {
-				log.Fatalf("could not publish finished event: %v\n", err.Error())
+			if err := finishedPublisher.PublishData(&jobEvent); err != nil {
+				log.Fatalf("could not publish finished job event: %v", err.Error())
 			}
 			doneCh <- struct{}{}
 		}

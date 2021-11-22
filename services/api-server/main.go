@@ -32,13 +32,22 @@ func main() {
 
 	// Nats
 	conn := events.ConnectToNats(clientId)
-	publisher := publishers.NewNatsPublisher(conn, "job:created")
 
-	listenerSubject := "job:finished"
-	listenerQueueGroup := "job-finished-group"
-	listener := listeners.NewJobFinishedListener(conn, listenerSubject, listenerQueueGroup, service)
+	// Job Created Publisher
+	jobCreatedSubject := "job:created"
+	publisher := publishers.NewJobEventPublisher(conn, jobCreatedSubject)
 
-	listener.Listen(listenerSubject)
+	// Job Finished listener
+	jobEventFinishedSubject := "job:finished"
+	jobEventFinishedQGroup := "job-finished-group"
+	finishedListener := listeners.NewJobEventListener(conn, jobEventFinishedSubject, jobEventFinishedQGroup, service)
+	finishedListener.Listen()
+
+	// Job Cancelled listener
+	jobEventCancelledSubject := "job:cancelled"
+	jobEventCancelledQGroup := "job-cancelled-group"
+	cancelledListener := listeners.NewJobEventListener(conn, jobEventCancelledSubject, jobEventCancelledQGroup, service)
+	cancelledListener.Listen()
 
 	// Handlers
 	handler := interfaces.NewHandler(service, publisher)

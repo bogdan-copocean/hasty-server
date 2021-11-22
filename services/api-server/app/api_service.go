@@ -50,7 +50,6 @@ func (as *apiService) ProcessJob(objectId string) (*domain.Job, error) {
 		return foundJob, nil
 	}
 
-	fmt.Println("job Not found HIT")
 	newJob := domain.Job{}
 
 	newJob.JobId = uuid.New().String()
