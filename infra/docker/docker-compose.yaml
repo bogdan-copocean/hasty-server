@@ -12,9 +12,10 @@ services:
       - hasty-network
 
   api_server:
-    build:
-      context: ../..
-      dockerfile: services/api-server/Dockerfile
+    # build:
+    #   context: ../..
+    #   dockerfile: services/api-server/Dockerfile
+    image: cobogdan/api-server:latest
     restart: always
     expose:
       - 9090
@@ -35,9 +36,10 @@ services:
       - hasty-network
 
   job_server:
-    build:
-      context: ../..
-      dockerfile: services/job-server/Dockerfile
+    image: cobogdan/job-server:latest
+    # build:
+    #   context: ../..
+    #   dockerfile: services/job-server/Dockerfile
     restart: always
     expose:
       - 9091
@@ -97,7 +99,8 @@ services:
     ports:
       - "80:80"
     depends_on:
-      - go_service
+      - api_server
+      - job_server
     volumes:
       - ../nginx/nginx.conf:/etc/nginx/nginx.conf:ro
     networks:

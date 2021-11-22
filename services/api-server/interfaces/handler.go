@@ -2,7 +2,6 @@ package interfaces
 
 import (
 	"encoding/json"
-	"io"
 	"net/http"
 
 	"github.com/bogdan-copocean/hasty-server/services/api-server/app"
@@ -33,10 +32,7 @@ func (handler *apiHandler) PostHandler(w http.ResponseWriter, r *http.Request) {
 
 	objectIdMap := map[string]string{}
 
-	body, _ := io.ReadAll(r.Body)
-	defer r.Body.Close()
-
-	if err := json.Unmarshal(body, &objectIdMap); err != nil {
+	if err := json.NewDecoder(r.Body).Decode(&objectIdMap); err != nil {
 		w.WriteHeader(http.StatusBadRequest)
 		render.JSON(w, http.StatusBadRequest, map[string]string{
 			"message": err.Error(),
