@@ -13,7 +13,6 @@ import (
 
 type ApiHandlerInterface interface {
 	PostHandler(w http.ResponseWriter, r *http.Request)
-	PutHandler(w http.ResponseWriter, r *http.Request)
 	GetHandler(w http.ResponseWriter, r *http.Request)
 }
 
@@ -75,10 +74,6 @@ func (handler *apiHandler) PostHandler(w http.ResponseWriter, r *http.Request) {
 		"message": job,
 	})
 
-}
-
-func (handler *apiHandler) PutHandler(w http.ResponseWriter, r *http.Request) {
-	w.Write([]byte("Put"))
 }
 
 func (handler *apiHandler) GetHandler(w http.ResponseWriter, r *http.Request) {

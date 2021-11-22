@@ -53,7 +53,6 @@ func main() {
 	handler := interfaces.NewApiHandler(service, publisher)
 
 	r.Post("/", handler.PostHandler)
-	r.Put("/", handler.PutHandler)
 	r.Get("/{objectId}", handler.GetHandler)
 
 	http.ListenAndServe(":9090", r)
