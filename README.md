@@ -22,7 +22,7 @@ I chose a Microservice architecutre approach for this project instead of a Monol
 **Flow**
 - Create job by making a POST request to ```http://localhost/``` with ```{"object_id": "random-object-id"}``` and receives back a job_id
 - Check its status at ```http://localhost/job_id```
-- Wait 5 minutes before rerunning the job with the same job id (otherwise will get an error)
+- Wait 5 minutes before rerunning the job with the same object id (otherwise will get an error)
 - If the job processing service goes down, the job will rerun when it comes back up
 
 You can configure a timeout period to cancel the job if needed - **default is 46 seconds**
