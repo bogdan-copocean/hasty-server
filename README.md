@@ -30,16 +30,18 @@ You can configure a timeout period to cancel the job if needed - **default is 46
 It can be scaled horizontally by using ```docker compose up --scale service_name=3```
 
 ## Installation
+I've built the images and pushed them to my docker hub repository, because when running the tests, it actually useses the same docker-compose file when building the environment, and I don't want to build my images every time I'm working on the tests (it takes too much time).
 
 ```bash
 docker-compose up
 ```
-or
+**or**
+
+*uncomment **context** and **dockerfile** from docker-compose on **api-server and job-server**, and comment image*
 
 ```bash
 docker-compose up --build
 ```
-*uncomment **context** and **dockerfile** from docker-compose on **api-server and job-server**, and comment image*
 
 ## E2E Testing
 
