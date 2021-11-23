@@ -5,6 +5,7 @@ import (
 	"net/http"
 
 	"github.com/bogdan-copocean/hasty-server/services/api-server/app"
+	"github.com/bogdan-copocean/hasty-server/services/api-server/domain"
 	"github.com/bogdan-copocean/hasty-server/services/api-server/events"
 	"github.com/bogdan-copocean/hasty-server/services/api-server/events/publishers"
 	"github.com/go-chi/chi/v5"
@@ -71,7 +72,7 @@ func (handler *apiHandler) PostHandler(w http.ResponseWriter, r *http.Request) {
 
 	w.WriteHeader(http.StatusCreated)
 	render.JSON(w, http.StatusCreated, map[string]interface{}{
-		"message": job,
+		"message": domain.ResponseJob{JobId: job.JobId},
 	})
 
 }
@@ -80,9 +81,9 @@ func (handler *apiHandler) GetHandler(w http.ResponseWriter, r *http.Request) {
 	render := render.New()
 	w.Header().Set("Content-Type", "application/json")
 
-	objectId := chi.URLParam(r, "objectId")
+	jobId := chi.URLParam(r, "jobId")
 
-	job, err := handler.apiService.GetJob(objectId)
+	job, err := handler.apiService.GetJob(jobId)
 	if err != nil {
 		w.WriteHeader(http.StatusBadRequest)
 		render.JSON(w, http.StatusBadRequest, map[string]string{

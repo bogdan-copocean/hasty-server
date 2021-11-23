@@ -24,7 +24,7 @@ func setUpContainers() (*testcontainers.LocalDockerCompose, error) {
 	if err != nil {
 		return nil, fmt.Errorf("Could not run compose file: %v - %v", composeFilePaths, err)
 	}
-
+	time.Sleep(time.Second)
 	return compose, nil
 }
 
@@ -40,8 +40,14 @@ type detailResponse struct {
 	Timestamp int64  `json:"timestamp"`
 }
 
-type successResponse struct {
+type getResponse struct {
 	Message detailResponse `json:"message"`
+}
+
+type createdResponse struct {
+	Message struct {
+		JobId string `json:"job_id"`
+	} `json:"message"`
 }
 
 func TestUserCreateJobFlow(t *testing.T) {
@@ -51,15 +57,13 @@ func TestUserCreateJobFlow(t *testing.T) {
 	}
 	defer compose.Down()
 
+	createdJob := createdResponse{}
+
 	t.Run("create job", func(t *testing.T) {
 		objectId := "random-object-id"
-		status := "processing"
 		payload := strings.NewReader(fmt.Sprintf(`{"object_id": "%v"}`, objectId))
 
-		succRes := successResponse{Message: detailResponse{}}
-		expected := successResponse{Message: detailResponse{ObjectId: objectId, Status: status}}
-
-		res, err := http.Post("http://localhost", "application/json", payload)
+		res, err := http.Post("http://localhost/", "application/json", payload)
 		if err != nil {
 			t.Fatal(err.Error())
 		}
@@ -70,20 +74,12 @@ func TestUserCreateJobFlow(t *testing.T) {
 		}
 		defer res.Body.Close()
 
-		if err := json.Unmarshal(data, &succRes); err != nil {
+		if err := json.Unmarshal(data, &createdJob); err != nil {
 			t.Fatalf("error not expected, but got: %v", err.Error())
 		}
 
 		if res.StatusCode != http.StatusCreated {
 			t.Errorf("got: %v, wanted %v", res.StatusCode, http.StatusCreated)
-		}
-
-		if succRes.Message.ObjectId != expected.Message.ObjectId {
-			t.Errorf("got: %v, wanted %v", succRes.Message.ObjectId, expected.Message.ObjectId)
-		}
-
-		if succRes.Message.Status != expected.Message.Status {
-			t.Errorf("got: %v, wanted %v", succRes.Message.Status, expected.Message.Status)
 		}
 	})
 
@@ -94,7 +90,7 @@ func TestUserCreateJobFlow(t *testing.T) {
 		errRes := errorResponse{}
 		expected := errorResponse{Message: "you need to wait 5 minutes before rerunning the same job"}
 
-		res, err := http.Post("http://localhost", "application/json", payload)
+		res, err := http.Post("http://localhost/", "application/json", payload)
 		if err != nil {
 			t.Fatal(err.Error())
 		}
@@ -118,15 +114,13 @@ func TestUserCreateJobFlow(t *testing.T) {
 		}
 	})
 
-	t.Run("create second job", func(t *testing.T) {
-		objectId := "random-object-id_number_two"
-		status := "processing"
-		payload := strings.NewReader(fmt.Sprintf(`{"object_id": "%v"}`, objectId))
+	t.Run("get non existing job", func(t *testing.T) {
+		nonExistingJob := "non-existing-job"
 
-		succRes := successResponse{Message: detailResponse{}}
-		expected := successResponse{Message: detailResponse{ObjectId: objectId, Status: status}}
+		errRes := errorResponse{}
+		expected := errorResponse{Message: "no job with id: " + nonExistingJob}
 
-		res, err := http.Post("http://localhost", "application/json", payload)
+		res, err := http.Get("http://localhost/" + nonExistingJob)
 		if err != nil {
 			t.Fatal(err.Error())
 		}
@@ -137,34 +131,27 @@ func TestUserCreateJobFlow(t *testing.T) {
 		}
 		defer res.Body.Close()
 
-		if err := json.Unmarshal(data, &succRes); err != nil {
+		if err := json.Unmarshal(data, &errRes); err != nil {
 			t.Fatalf("error not expected, but got: %v", err.Error())
 		}
 
-		if res.StatusCode != http.StatusCreated {
-			t.Errorf("got: %v, wanted %v", res.StatusCode, http.StatusCreated)
+		if res.StatusCode != http.StatusBadRequest {
+			t.Errorf("got: %v, wanted %v", res.StatusCode, http.StatusBadRequest)
 		}
 
-		if succRes.Message.ObjectId != expected.Message.ObjectId {
-			t.Errorf("got: %v, wanted %v", succRes.Message.ObjectId, expected.Message.ObjectId)
-		}
-
-		if succRes.Message.Status != expected.Message.Status {
-			t.Errorf("got: %v, wanted %v", succRes.Message.Status, expected.Message.Status)
+		if errRes.Message != expected.Message {
+			t.Errorf("got: %v, wanted %v", errRes.Message, expected.Message)
 		}
 	})
 
-	t.Run("sleep to finish job processing and verify updated status", func(t *testing.T) {
-		fmt.Println("[!] sleeping for 45 seconds to finish the job...")
-		time.Sleep(time.Second * 45)
-
+	t.Run("get job and verify its status", func(t *testing.T) {
 		objectId := "random-object-id"
-		status := "finished"
+		status := "processing"
 
-		succRes := successResponse{Message: detailResponse{}}
-		expected := successResponse{Message: detailResponse{ObjectId: objectId, Status: status}}
+		succRes := getResponse{Message: detailResponse{}}
+		expected := getResponse{Message: detailResponse{ObjectId: objectId, Status: status, JobId: createdJob.Message.JobId}}
 
-		res, err := http.Get("http://localhost/" + objectId)
+		res, err := http.Get("http://localhost/" + createdJob.Message.JobId)
 		if err != nil {
 			t.Fatal(err.Error())
 		}
@@ -189,6 +176,52 @@ func TestUserCreateJobFlow(t *testing.T) {
 
 		if succRes.Message.Status != expected.Message.Status {
 			t.Errorf("got: %v, wanted %v", succRes.Message.Status, expected.Message.Status)
+		}
+
+		if succRes.Message.JobId != expected.Message.JobId {
+			t.Errorf("got: %v, wanted %v", succRes.Message.JobId, expected.Message.JobId)
+		}
+	})
+
+	t.Run("sleep to finish job processing and verify updated status", func(t *testing.T) {
+		fmt.Println("[!] sleeping for 45 seconds to finish the job...")
+		time.Sleep(time.Second * 45)
+
+		objectId := "random-object-id"
+		status := "finished"
+
+		succRes := getResponse{Message: detailResponse{}}
+		expected := getResponse{Message: detailResponse{ObjectId: objectId, Status: status, JobId: createdJob.Message.JobId}}
+
+		res, err := http.Get("http://localhost/" + createdJob.Message.JobId)
+		if err != nil {
+			t.Fatal(err.Error())
+		}
+
+		data, err := ioutil.ReadAll(res.Body)
+		if err != nil {
+			t.Fatalf("error not expected, but got: %v", err.Error())
+		}
+		defer res.Body.Close()
+
+		if err := json.Unmarshal(data, &succRes); err != nil {
+			t.Fatalf("error not expected, but got: %v", err.Error())
+		}
+
+		if res.StatusCode != http.StatusOK {
+			t.Errorf("got: %v, wanted %v", res.StatusCode, http.StatusOK)
+		}
+
+		if succRes.Message.ObjectId != expected.Message.ObjectId {
+			t.Errorf("got: %v, wanted %v", succRes.Message.ObjectId, expected.Message.ObjectId)
+		}
+
+		if succRes.Message.Status != expected.Message.Status {
+			t.Errorf("got: %v, wanted %v", succRes.Message.Status, expected.Message.Status)
+		}
+
+		if succRes.Message.JobId != expected.Message.JobId {
+			t.Errorf("got: %v, wanted %v", succRes.Message.JobId, expected.Message.JobId)
 		}
 	})
 }

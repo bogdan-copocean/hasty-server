@@ -7,3 +7,7 @@ type Job struct {
 	Status    string `json:"status"`
 	Timestamp int64  `json:"timestamp" bson:"timestamp"`
 }
+
+type ResponseJob struct {
+	JobId string `json:"job_id"`
+}

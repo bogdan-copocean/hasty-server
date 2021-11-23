@@ -71,12 +71,12 @@ func (as *apiService) UpdateJob(job *domain.Job) error {
 	return nil
 }
 
-func (as *apiService) GetJob(objectId string) (*domain.Job, error) {
-	job, err := as.mongoRepo.GetJobByObjectId(objectId)
+func (as *apiService) GetJob(jobId string) (*domain.Job, error) {
+	job, err := as.mongoRepo.GetJobByJobId(jobId)
 
 	if err != nil {
 		if err == mongo.ErrNoDocuments {
-			return nil, fmt.Errorf("no job with id: %v", objectId)
+			return nil, fmt.Errorf("no job with id: %v", jobId)
 		}
 		return nil, fmt.Errorf("could not get job from mongo %v", err.Error())
 	}

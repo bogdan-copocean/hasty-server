@@ -13,6 +13,7 @@ import (
 )
 
 type MongoRepository interface {
+	GetJobByJobId(jobId string) (*domain.Job, error)
 	GetJobByObjectId(objectId string) (*domain.Job, error)
 	SetJob(job *domain.Job) error
 	UpdateJobStatus(job *domain.Job) error
@@ -35,6 +36,20 @@ func (repo *mongoRepository) GetJobByObjectId(objectId string) (*domain.Job, err
 
 	opts := options.FindOne().SetSort(bson.M{"timestamp": -1})
 	if err := repo.collection.FindOne(ctx, bson.M{"objectId": objectId}, opts).Decode(&job); err != nil {
+		return nil, err
+	}
+
+	return &job, nil
+}
+
+func (repo *mongoRepository) GetJobByJobId(jobId string) (*domain.Job, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	job := domain.Job{}
+
+	opts := options.FindOne().SetSort(bson.M{"timestamp": -1})
+	if err := repo.collection.FindOne(ctx, bson.M{"jobId": jobId}, opts).Decode(&job); err != nil {
 		return nil, err
 	}
 
