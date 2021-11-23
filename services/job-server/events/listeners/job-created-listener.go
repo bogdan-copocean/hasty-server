@@ -76,11 +76,12 @@ func msgHandler(msg *stan.Msg, client stan.Conn, finishedPublisher, cancelledPub
 	}
 
 	sleepTimeUsed := rand.Intn(MaxSleepTime-MinSleepTime) + MinSleepTime
-	jobEvent.SleepTimeUsed = sleepTimeUsed
+	jobEvent.Job.SleepTimeUsed = sleepTimeUsed
 
 	go func() {
 
 		time.Sleep(time.Duration(sleepTimeUsed) * time.Second)
+		jobEvent.Job.SleepTimeUsed = sleepTimeUsed
 
 		select {
 		case <-ctx.Done():

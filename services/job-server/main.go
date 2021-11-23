@@ -26,7 +26,7 @@ func main() {
 	repo := repository.ConnectToMongo()
 
 	// Nats
-	conn := events.ConnectToNats(clientId + "1")
+	conn := events.ConnectToNats(clientId)
 
 	// Job Finished Publisher
 	jobFinishedSubject := publishers.JobFinishedSubject

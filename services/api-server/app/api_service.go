@@ -42,6 +42,7 @@ func (as *apiService) ProcessJob(objectId string) (*domain.Job, error) {
 		foundJob.JobId = uuid.New().String()
 		foundJob.Status = "processing"
 		foundJob.Timestamp = now
+		foundJob.SleepTimeUsed = 0
 
 		if err = as.mongoRepo.SetJob(foundJob); err != nil {
 			return nil, fmt.Errorf("could not set found job to mongo %v", err.Error())
@@ -56,6 +57,7 @@ func (as *apiService) ProcessJob(objectId string) (*domain.Job, error) {
 	newJob.Status = "processing"
 	newJob.Timestamp = now
 	newJob.ObjectId = objectId
+	newJob.SleepTimeUsed = 0
 
 	if err = as.mongoRepo.SetJob(&newJob); err != nil {
 		return nil, fmt.Errorf("could not set new job to mongo %v", err.Error())
@@ -65,7 +67,7 @@ func (as *apiService) ProcessJob(objectId string) (*domain.Job, error) {
 }
 
 func (as *apiService) UpdateJob(job *domain.Job) error {
-	if err := as.mongoRepo.UpdateJobStatus(job); err != nil {
+	if err := as.mongoRepo.UpdateJobStatusAndTimeSlept(job); err != nil {
 		return fmt.Errorf("could not update job to mongo %v", err.Error())
 	}
 	return nil
